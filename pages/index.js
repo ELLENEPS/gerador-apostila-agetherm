@@ -127,6 +127,8 @@ export default function GeradorApostila() {
         <div className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 print:bg-white print:py-0 print:px-0">
             <Head>
                 <title>Gerador de Apostila - AGETHERM</title>
+                <link rel="icon" href="/favicon.ico" />
+                <link rel="shortcut icon" href="/logo.png" />
             </Head>
 
             {/* PAINEL DE CONTROLE DE CONFIGURAÇÕES */}
