@@ -14,10 +14,10 @@ export default function GeradorApostila() {
 
     const handleDownloadModelo = () => {
         const dadosModelo = [
-            { 'CATEGORIA': 'CONEXÕES', 'REFERÊNCIA': 'REF-001', 'DESCRIÇÃO': 'JOELHO 90 GRAUS 22MM PARA TUBULAÇÃO DE COBRE E SOLDA', 'CÓDIGO DE BARRAS': '7891234567890' },
-            { 'CATEGORIA': 'CONEXÕES', 'REFERÊNCIA': 'REF-002', 'DESCRIÇÃO': 'LUVA REDUÇÃO 28X22MM', 'CÓDIGO DE BARRAS': '7891234567891' },
-            { 'CATEGORIA': 'VÁLVULAS', 'REFERÊNCIA': 'REF-003', 'DESCRIÇÃO': 'VÁLVULA ESFERA 3/4 PASSO PLENO ROSTÁVEL', 'CÓDIGO DE BARRAS': '7891234567892' },
-            { 'CATEGORIA': 'VÁLVULAS', 'REFERÊNCIA': 'REF-004', 'DESCRIÇÃO': 'VÁLVULA RETENÇÃO 1 POL', 'CÓDIGO DE BARRAS': '7891234567893' }
+            { 'CATEGORIA': 'CONEXÕES', 'REFERÊNCIA': 'REF-001', 'MÚLTIPLO VENDA': '1 PCT', 'DESCRIÇÃO': 'JOELHO 90 GRAUS 22MM PARA TUBULAÇÃO DE COBRE E SOLDA', 'CÓDIGO DE BARRAS': '7891234567890' },
+            { 'CATEGORIA': 'CONEXÕES', 'REFERÊNCIA': 'REF-002', 'MÚLTIPLO VENDA': '5 UN', 'DESCRIÇÃO': 'LUVA REDUÇÃO 28X22MM', 'CÓDIGO DE BARRAS': '7891234567891' },
+            { 'CATEGORIA': 'VÁLVULAS', 'REFERÊNCIA': 'REF-003', 'MÚLTIPLO VENDA': '10 UN', 'DESCRIÇÃO': 'VÁLVULA ESFERA 3/4 PASSO PLENO ROSTÁVEL', 'CÓDIGO DE BARRAS': '7891234567892' },
+            { 'CATEGORIA': 'VÁLVULAS', 'REFERÊNCIA': 'REF-004', 'MÚLTIPLO VENDA': '1 PCT', 'DESCRIÇÃO': 'VÁLVULA RETENÇÃO 1 POL', 'CÓDIGO DE BARRAS': '7891234567893' }
         ];
 
         const worksheet = XLSX.utils.json_to_sheet(dadosModelo);
@@ -48,6 +48,7 @@ export default function GeradorApostila() {
                 jsonData.forEach((row) => {
                     const categoria = String(row['CATEGORIA'] || row['Categoria'] || 'GERAL').trim().toUpperCase();
                     const codigo = String(row['REFERÊNCIA'] || row['REFERENCIA'] || row['Referência'] || row['Referencia'] || row['Código'] || row['Codigo'] || 'SEM REFERÊNCIA').trim();
+                    const multiplo = String(row['MÚLTIPLO VENDA'] || row['MULTIPLO VENDA'] || row['Múltiplo Venda'] || row['Multiplo Venda'] || row['MÚLTIPLO'] || row['MULTIPLO'] || row['Múltiplo'] || row['Multiplo'] || '').trim();
                     const descricao = String(row['DESCRIÇÃO'] || row['DESCRICAO'] || row['Descrição'] || row['Descricao'] || row['PRODUTO'] || row['Produto'] || row['NOME'] || row['Nome'] || '').trim();
                     const codBarras = String(row['CÓDIGO DE BARRAS'] || row['CODIGO DE BARRAS'] || row['Código de Barras'] || row['Codigo de Barras'] || row['BARRAS'] || row['EAN'] || row['BARCODE'] || codigo).trim();
 
@@ -57,6 +58,7 @@ export default function GeradorApostila() {
 
                     gruposMap.get(categoria).push({
                         codigo,
+                        multiplo,
                         descricao,
                         codBarras
                     });
@@ -165,7 +167,7 @@ export default function GeradorApostila() {
                                 Importar Dados da Planilha
                             </h2>
                             <p className="text-xs text-slate-500 mt-1">
-                                Envie um arquivo contendo as colunas <span className="font-bold text-slate-700">CATEGORIA</span>, <span className="font-bold text-slate-700">REFERÊNCIA</span>, <span className="font-bold text-slate-700">DESCRIÇÃO</span> e <span className="font-bold text-slate-700">CÓDIGO DE BARRAS</span>.
+                                Envie um arquivo contendo as colunas <span className="font-bold text-slate-700">CATEGORIA</span>, <span className="font-bold text-slate-700">REFERÊNCIA</span>, <span className="font-bold text-slate-700">MÚLTIPLO VENDA</span>, <span className="font-bold text-slate-700">DESCRIÇÃO</span> e <span className="font-bold text-slate-700">CÓDIGO DE BARRAS</span>.
                             </p>
                         </div>
 
@@ -266,9 +268,16 @@ export default function GeradorApostila() {
                                                 #{item.numeroSequencial}
                                             </span>
                                             <div className="flex flex-col min-w-0">
-                                                <span className="text-sm font-black text-[#002B5B] tracking-tight shrink-0 leading-tight">
-                                                    {item.codigo}
-                                                </span>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-black text-[#002B5B] tracking-tight leading-tight">
+                                                        {item.codigo}
+                                                    </span>
+                                                    {item.multiplo && (
+                                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">
+                                                            - {item.multiplo}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {item.descricao && (
                                                     <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-tight leading-snug line-clamp-2">
                                                         {item.descricao}
