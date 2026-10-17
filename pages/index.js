@@ -6,7 +6,7 @@ import bwipjs from 'bwip-js';
 export default function GeradorApostila() {
     const [tipoApostila, setTipoApostila] = useState('BARRAS'); // 'BARRAS' ou 'OUTLET'
     const [paginasA4, setPaginasA4] = useState([]);
-    const [indiceCategorias, setIndiceCategorias] = useState([]);
+    const [paginasIndice, setPaginasIndice] = useState([]);
     const [totalItens, setTotalItens] = useState(0);
     const [carregando, setCarregando] = useState(false);
     const [nomeArquivo, setNomeArquivo] = useState('');
@@ -15,7 +15,7 @@ export default function GeradorApostila() {
     const handleTrocaTipo = (novoTipo) => {
         setTipoApostila(novoTipo);
         setPaginasA4([]);
-        setIndiceCategorias([]);
+        setPaginasIndice([]);
         setTotalItens(0);
         setNomeArquivo('');
         if (novoTipo === 'OUTLET') {
@@ -24,8 +24,6 @@ export default function GeradorApostila() {
             setTituloApostila('CATÁLOGO DE CÓDIGOS DE BARRAS');
         }
     };
-
-    const ITENS_POR_PAGINA = tipoApostila === 'OUTLET' ? 8 : 12;
 
     const handleDownloadModelo = () => {
         let dadosModelo = [];
@@ -126,13 +124,9 @@ export default function GeradorApostila() {
                     }
                 });
 
-                const listagemLinear = [];
-                const resumoIndice = [];
-                const categoriasVistasEmPagina = new Map();
-
-                let numeroPaginaInicial = tipoApostila === 'OUTLET' ? 3 : 1;
-
                 if (tipoApostila === 'OUTLET') {
+                    const listagemLinear = [];
+                    
                     gruposMap.forEach((itensCategoria, nomeCategoria) => {
                         itensCategoria.sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -144,11 +138,37 @@ export default function GeradorApostila() {
                         });
                     });
 
-                    const paginasMontadas = [];
+                    // 1. Calcula quantidade de categorias e monta as páginas do Índice (até 18 itens por página A4)
+                    const categoriasLista = Array.from(gruposMap.keys());
+                    const CATEGORIAS_POR_PAGINA_INDICE = 18;
+                    const qtdPaginasIndice = Math.ceil(categoriasLista.length / CATEGORIAS_POR_PAGINA_INDICE) || 1;
+
+                    // Página 1 = Capa | Índice = Páginas seguintes | Produtos começam após o índice
+                    const numeroPaginaInicialProdutos = 1 + qtdPaginasIndice + 1;
+
+                    const paginasProdutosTemp = [];
                     let paginaAtual = [];
-                    let numPagina = numeroPaginaInicial;
+                    let pesoAtual = 0;
+                    let numPagina = numeroPaginaInicialProdutos;
+
+                    // LIMITE EXPANDIDO PARA PREENCHER A FOLHA A4 QUASE 100%
+                    const LIMITE_PESO_PAGINA = 12.5;
+                    const categoriasVistasEmPagina = new Map();
+                    const resumoIndice = [];
 
                     listagemLinear.forEach((item) => {
+                        const pesoItem = item.ehInicioCategoria ? 1.3 : 1.0;
+
+                        if (pesoAtual + pesoItem > LIMITE_PESO_PAGINA && paginaAtual.length > 0) {
+                            paginasProdutosTemp.push({
+                                itens: paginaAtual,
+                                numPagina: numPagina
+                            });
+                            paginaAtual = [];
+                            pesoAtual = 0;
+                            numPagina++;
+                        }
+
                         if (item.ehInicioCategoria && !categoriasVistasEmPagina.has(item.categoria)) {
                             categoriasVistasEmPagina.set(item.categoria, numPagina);
                             resumoIndice.push({
@@ -158,34 +178,39 @@ export default function GeradorApostila() {
                         }
 
                         paginaAtual.push(item);
-
-                        if (paginaAtual.length === ITENS_POR_PAGINA) {
-                            paginasMontadas.push({
-                                itens: paginaAtual,
-                                numPagina: numPagina
-                            });
-                            paginaAtual = [];
-                            numPagina++;
-                        }
+                        pesoAtual += pesoItem;
                     });
 
                     if (paginaAtual.length > 0) {
-                        paginasMontadas.push({
+                        paginasProdutosTemp.push({
                             itens: paginaAtual,
                             numPagina: numPagina
                         });
                     }
 
-                    setPaginasA4(paginasMontadas);
-                    setIndiceCategorias(resumoIndice);
+                    // Monta as páginas do Índice
+                    const paginasIndiceMontadas = [];
+                    for (let i = 0; i < resumoIndice.length; i += CATEGORIAS_POR_PAGINA_INDICE) {
+                        paginasIndiceMontadas.push({
+                            itens: resumoIndice.slice(i, i + CATEGORIAS_POR_PAGINA_INDICE),
+                            numPagina: 2 + paginasIndiceMontadas.length
+                        });
+                    }
+
+                    if (paginasIndiceMontadas.length === 0) {
+                        paginasIndiceMontadas.push({ itens: [], numPagina: 2 });
+                    }
+
+                    setPaginasA4(paginasProdutosTemp);
+                    setPaginasIndice(paginasIndiceMontadas);
                 } else {
                     const paginasMontadas = [];
                     let numPagina = 1;
 
                     gruposMap.forEach((itensCategoria, nomeCategoria) => {
                         let indiceItemLocal = 1;
-                        for (let i = 0; i < itensCategoria.length; i += ITENS_POR_PAGINA) {
-                            const fatiaItens = itensCategoria.slice(i, i + ITENS_POR_PAGINA).map((item) => ({
+                        for (let i = 0; i < itensCategoria.length; i += 12) {
+                            const fatiaItens = itensCategoria.slice(i, i + 12).map((item) => ({
                                 ...item,
                                 numeroSequencial: indiceItemLocal++
                             }));
@@ -247,7 +272,7 @@ export default function GeradorApostila() {
     };
 
     const dataAtualExtenso = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
-    const totalPaginasPDF = tipoApostila === 'OUTLET' ? paginasA4.length + 2 : paginasA4.length;
+    const totalPaginasPDF = tipoApostila === 'OUTLET' ? 1 + paginasIndice.length + paginasA4.length : paginasA4.length;
 
     return (
         <div className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800 print:bg-white print:py-0 print:px-0">
@@ -379,7 +404,7 @@ export default function GeradorApostila() {
             {paginasA4.length > 0 ? (
                 <div className="space-y-10 print:space-y-0">
                     
-                    {/* CAPA E ÍNDICE (SOMENTE MODO OUTLET) */}
+                    {/* CAPA E ÍNDICE(S) (SOMENTE MODO OUTLET) */}
                     {tipoApostila === 'OUTLET' && (
                         <>
                             {/* PÁGINA 1 - CAPA ELEGANTE */}
@@ -389,7 +414,7 @@ export default function GeradorApostila() {
                             >
                                 <div className="flex justify-between items-start z-10">
                                     <div className="h-16">
-                                        <img src="/logo.png" alt="Agetherm" className="h-full object-contain brightness-0 invert" />
+                                        <img src="/logo2.png" alt="Agetherm" className="h-full object-contain" />
                                     </div>
                                     <span style={{ backgroundColor: '#FF8C00', color: '#ffffff' }} className="text-xs font-black tracking-widest uppercase px-3 py-1 rounded-full shadow-sm">
                                         OFERTAS ESPECIAIS
@@ -417,40 +442,42 @@ export default function GeradorApostila() {
                                 </div>
                             </div>
 
-                            {/* PÁGINA 2 - ÍNDICE */}
-                            <div className="pagina-a4 max-w-[210mm] mx-auto bg-white p-0 shadow-xl rounded-xl print:shadow-none print:rounded-none print:w-full flex flex-col justify-between h-[297mm] overflow-hidden">
-                                <div style={{ backgroundColor: '#002B5B' }} className="px-10 py-5 flex justify-between items-center shrink-0">
-                                    <h1 className="text-2xl font-black text-white uppercase tracking-tight">
-                                        ÍNDICE DE CATEGORIAS
-                                    </h1>
-                                    <div className="h-8">
-                                        <img src="/logo.png" alt="Agetherm" className="h-full object-contain brightness-0 invert" />
+                            {/* PÁGINAS DO ÍNDICE DINÂMICO MULTIPÁGINA */}
+                            {paginasIndice.map((pagInd, idxInd) => (
+                                <div key={idxInd} className="pagina-a4 max-w-[210mm] mx-auto bg-white p-0 shadow-xl rounded-xl print:shadow-none print:rounded-none print:w-full flex flex-col justify-between h-[297mm] overflow-hidden">
+                                    <div style={{ backgroundColor: '#002B5B' }} className="px-10 py-5 flex justify-between items-center shrink-0">
+                                        <h1 className="text-2xl font-black text-white uppercase tracking-tight">
+                                            ÍNDICE DE CATEGORIAS {paginasIndice.length > 1 ? `(${idxInd + 1}/${paginasIndice.length})` : ''}
+                                        </h1>
+                                        <div className="h-8">
+                                            <img src="/logo2.png" alt="Agetherm" className="h-full object-contain" />
+                                        </div>
+                                    </div>
+
+                                    <div className="p-10 flex-1 space-y-3.5">
+                                        {pagInd.itens.map((item, idx) => (
+                                            <div key={idx} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-100">
+                                                <span className="font-black text-[#002B5B] uppercase tracking-wide">
+                                                    {item.categoria}
+                                                </span>
+                                                <span className="flex-1 mx-4 border-b-2 border-dotted border-slate-300 h-3"></span>
+                                                <span className="font-black text-[#FF8C00]">
+                                                    PÁG. {item.paginaInicial}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="px-10 pb-6 pt-3 border-t border-slate-200 text-xs font-bold text-slate-400 flex justify-between items-center shrink-0">
+                                        <span>OUTLET AGETHERM</span>
+                                        <span>PÁG. {pagInd.numPagina} DE {totalPaginasPDF}</span>
                                     </div>
                                 </div>
-
-                                <div className="p-10 flex-1 space-y-4">
-                                    {indiceCategorias.map((item, idx) => (
-                                        <div key={idx} className="flex items-center justify-between text-base py-2 border-b border-slate-100">
-                                            <span className="font-black text-[#002B5B] uppercase tracking-wide">
-                                                {item.categoria}
-                                            </span>
-                                            <span className="flex-1 mx-4 border-b-2 border-dotted border-slate-300 h-3"></span>
-                                            <span className="font-black text-[#FF8C00]">
-                                                PÁG. {item.paginaInicial}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="px-10 pb-6 pt-3 border-t-4 border-[#FF8C00] text-xs font-bold text-slate-400 flex justify-between items-center shrink-0">
-                                    <span>OUTLET AGETHERM</span>
-                                    <span>PÁG. 2 DE {totalPaginasPDF}</span>
-                                </div>
-                            </div>
+                            ))}
                         </>
                     )}
 
-                    {/* PÁGINAS DE PRODUTOS */}
+                    {/* PÁGINAS DE PRODUTOS COMPLETA MÁXIMA */}
                     {paginasA4.map((pagina, pIndex) => (
                         <div
                             key={pIndex}
@@ -462,15 +489,15 @@ export default function GeradorApostila() {
                                     {tituloApostila}
                                 </h2>
                                 <div className="h-8">
-                                    <img src="/logo.png" alt="Agetherm" className="h-full object-contain brightness-0 invert" />
+                                    <img src="/logo2.png" alt="Agetherm" className="h-full object-contain" />
                                 </div>
                             </div>
 
-                            {/* LISTA DE PRODUTOS - ESPAÇAMENTO UNIFORME E FIXO NO TOPO */}
+                            {/* LISTA DE PRODUTOS COMPLETA E SEM SOBRA EXAGERADA */}
                             {tipoApostila === 'OUTLET' ? (
-                                <div className="px-8 py-4 flex-1 flex flex-col justify-start gap-3 overflow-hidden">
+                                <div className="px-8 pt-1 pb-1 flex-1 flex flex-col justify-start gap-0.5 overflow-hidden">
                                     {pagina.itens.map((item, itemIdx) => (
-                                        <div key={itemIdx} className="flex flex-col gap-1">
+                                        <div key={itemIdx} className="flex flex-col gap-0.5">
                                             {/* BARRA DA CATEGORIA */}
                                             {item.ehInicioCategoria && (
                                                 <div className="bg-[#002B5B] text-white px-3 py-1 rounded font-black text-xs uppercase tracking-wider border-l-4 border-[#FF8C00] shadow-sm my-0.5">
@@ -479,10 +506,10 @@ export default function GeradorApostila() {
                                             )}
 
                                             {/* CARD DO PRODUTO */}
-                                            <div className="py-2.5 px-3 flex items-center justify-between gap-4 print:break-inside-avoid border-b border-slate-200 min-h-[82px]">
+                                            <div className="py-1.5 px-3 flex items-center justify-between gap-4 print:break-inside-avoid border-b border-slate-200 min-h-[74px]">
                                                 {/* FOTO E DADOS */}
                                                 <div className="flex items-center gap-4 overflow-hidden min-w-0 flex-1">
-                                                    <div className="w-20 h-20 rounded-xl border border-slate-200 overflow-hidden bg-white shrink-0 flex items-center justify-center p-1 shadow-sm">
+                                                    <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden bg-white shrink-0 flex items-center justify-center p-1 shadow-sm">
                                                         <img
                                                             src={`/produtos/${item.foto}.jpg`}
                                                             alt={item.codigo}
@@ -497,8 +524,8 @@ export default function GeradorApostila() {
                                                         />
                                                     </div>
 
-                                                    <div className="flex flex-col min-w-0 space-y-1">
-                                                        <span className="text-base font-black text-[#002B5B] tracking-tight leading-tight">
+                                                    <div className="flex flex-col min-w-0 space-y-0.5">
+                                                        <span className="text-sm font-black text-[#002B5B] tracking-tight leading-tight">
                                                             {item.codigo}
                                                         </span>
                                                         {item.descricao && (
@@ -510,13 +537,13 @@ export default function GeradorApostila() {
                                                 </div>
 
                                                 {/* PREÇO DE/POR DESTACADO */}
-                                                <div className="flex items-center gap-3 shrink-0 bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-inner">
+                                                <div className="flex items-center gap-3 shrink-0 bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-inner">
                                                     <div className="bg-[#FF8C00] text-white text-xs font-black px-2 py-1 rounded shadow-sm">
                                                         -45% OFF
                                                     </div>
 
-                                                    <div className="text-right min-w-[120px]">
-                                                        <div className="text-xs font-bold text-rose-500 line-through leading-none mb-1">
+                                                    <div className="text-right min-w-[115px]">
+                                                        <div className="text-xs font-bold text-rose-500 line-through leading-none mb-0.5">
                                                             DE: {formatarMoeda(item.precoOriginal)}
                                                         </div>
                                                         <div className="text-base font-black text-emerald-600 leading-tight">
@@ -567,8 +594,8 @@ export default function GeradorApostila() {
                                 </div>
                             )}
 
-                            {/* RODAPÉ COM LISTRA LARANJA */}
-                            <div className="px-8 pb-5 pt-3 border-t-4 border-[#FF8C00] text-xs font-bold text-slate-400 flex justify-between items-center shrink-0">
+                            {/* RODAPÉ LIMPO */}
+                            <div className="px-8 pb-5 pt-3 border-t border-slate-200 text-xs font-bold text-slate-400 flex justify-between items-center shrink-0">
                                 <span>OUTLET AGETHERM</span>
                                 <span>PÁG. {pagina.numPagina} DE {totalPaginasPDF}</span>
                             </div>
